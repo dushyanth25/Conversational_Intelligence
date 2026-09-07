@@ -4,9 +4,10 @@ from pydantic import ValidationError
 from config.settings import Settings, get_settings
 
 
-def test_default_values():
+def test_default_values(monkeypatch):
     """Test that default values are correctly populated."""
-    settings = Settings()
+    monkeypatch.delenv("APP_ENV", raising=False)
+    settings = Settings(_env_file=None)
 
     assert settings.APP_ENV == "development"
     assert settings.PARAMETERS_PER_BATCH == 3
@@ -82,6 +83,9 @@ def test_invalid_device(monkeypatch):
 def test_missing_required_secrets(monkeypatch):
     """Test how the settings system handles secrets.
     Here we expect them to be optional or loaded securely."""
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    monkeypatch.delenv("POSTGRES_PASSWORD", raising=False)
+    monkeypatch.delenv("MINIO_SECRET_KEY", raising=False)
     # Since we set them as Optional[SecretStr], they should be None by default
     settings = Settings(_env_file=None)
     assert settings.GROQ_API_KEY is None
