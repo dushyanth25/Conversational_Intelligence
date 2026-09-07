@@ -1,0 +1,48 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: conversation-intelligence-run-local-
+  namespace: argo
+spec:
+  entrypoint: main
+  templates:
+  - name: main
+    container:
+      image: conversation-intelligence-worker:latest
+      imagePullPolicy: Never
+      command: ["python", "run_local.py", "audio.wav", "sample_prompts.csv"]
+      env:
+        # Pass the Databricks and Groq environment variables
+        - name: DATABRICKS_HOST
+          value: ""
+        - name: DATABRICKS_HTTP_PATH
+          value: ""
+        - name: DATABRICKS_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: pipeline-secrets
+              key: databricks-token
+              optional: true
+        - name: DATABRICKS_CATALOG
+          value: "workspace"
+        - name: DATABRICKS_SCHEMA
+          value: "default"
+        - name: GROQ_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: pipeline-secrets
+              key: groq-api-key
+              optional: true
+        - name: HF_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: pipeline-secrets
+              key: hf-token
+              optional: true
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 2Gi
+        limits:
+          cpu: 2000m
+          memory: 4Gi

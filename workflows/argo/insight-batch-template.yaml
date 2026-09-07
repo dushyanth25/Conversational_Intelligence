@@ -1,0 +1,63 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: insight-batch-template
+spec:
+  entrypoint: process-batches
+  arguments:
+    parameters:
+    - name: call_id
+    - name: batches_json_path
+    - name: parallel_workers
+      value: "5"
+
+  templates:
+  - name: process-batches
+    inputs:
+      parameters:
+      - name: call_id
+      - name: batches_json_path
+      - name: parallel_workers
+    dag:
+      tasks:
+      - name: fetch-batches
+        template: fetch-batches-task
+        arguments:
+          parameters:
+          - name: batches_json_path
+            value: "{{inputs.parameters.batches_json_path}}"
+            
+      - name: parallel-process
+        template: insight-processing-task
+        dependencies: [fetch-batches]
+        arguments:
+          parameters:
+          - name: call_id
+            value: "{{inputs.parameters.call_id}}"
+          - name: batch_id
+            value: "{{item.batch_id}}"
+        withParam: "{{tasks.fetch-batches.outputs.parameters.batch-list}}"
+
+  - name: fetch-batches-task
+    inputs:
+      parameters:
+      - name: batches_json_path
+    outputs:
+      parameters:
+      - name: batch-list
+        valueFrom:
+          path: /mnt/vol/batches_list.json
+    container:
+      image: conversation-intelligence-worker:latest
+      command: ["sh", "-c"]
+      args: ["cp {{inputs.parameters.batches_json_path}} /mnt/vol/batches_list.json"]
+      
+  - name: insight-processing-task
+    inputs:
+      parameters:
+      - name: call_id
+      - name: batch_id
+    container:
+      image: conversation-intelligence-worker:latest
+      command: ["python", "-m", "pipeline.insights.batch_processor"]
+      args: ["--call-id", "{{inputs.parameters.call_id}}", "--batch-id", "{{inputs.parameters.batch_id}}"]

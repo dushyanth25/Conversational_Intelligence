@@ -1,0 +1,27 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: conversation-pipeline-
+spec:
+  workflowTemplateRef:
+    name: conversation-pipeline-template
+  arguments:
+    parameters:
+    - name: audio_path
+      value: "s3://conversation-intelligence/raw-audio/call_001.wav"
+    - name: prompt_sheet
+      value: "s3://conversation-intelligence/prompts/insights.csv"
+    - name: call_id
+      value: "CALL_001"
+    - name: parallel_workers
+      value: "5"
+    - name: parameters_per_batch
+      value: "3"
+    - name: language
+      value: "en"
+    - name: enable_vad
+      value: "true"
+    - name: enable_speaker_tagging
+      value: "true"
+    - name: gpu_count
+      value: "0"

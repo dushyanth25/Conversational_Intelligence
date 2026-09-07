@@ -1,0 +1,28 @@
+# ConfigMap configuration for Argo Workflow Controller
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: workflow-controller-configmap
+  namespace: argo
+data:
+  # Controls Level 1 Concurrency: Max number of workflow executions concurrently
+  parallelism: "3" 
+  
+  # Ensure workflow artifacts default to MinIO configuration
+  artifactRepository: |
+    s3:
+      endpoint: minio.argo.svc.cluster.local:9000
+      bucket: conversation-intelligence
+      insecure: true
+      accessKeySecret:
+        name: my-minio-cred
+        key: accesskey
+      secretKeySecret:
+        name: my-minio-cred
+        key: secretkey
+
+  # Optional config to manage stale workflows automatically
+  retentionPolicy: |
+    completed: 10
+    failed: 10
+    errored: 10

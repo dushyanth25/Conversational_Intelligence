@@ -1,0 +1,11 @@
+parameter,prompt
+root_cause_analysis,"Extract the underlying systemic or product root cause driving the customer's query, distinguishing between user error, missing features, or platform bugs."
+churn_probability_index,"Assess the implicit and explicit signals of customer churn on a scale of 0-100, citing specific linguistic markers like frustration, competitor comparisons, or contract-cancellation mentions."
+agent_cognitive_load,"Evaluate the conversational flow for signs of high cognitive load or tooling friction on the agent, such as prolonged silences, filler words while navigating internal systems, or repetitive clarifying questions."
+objection_handling_efficacy,"Analyze how effectively the agent identified and neutralized customer objections, categorized by empathy bridging, logical refutation, or value restatement. Note any missed opportunities."
+upsell_crossell_opportunity,"Identify missed or successfully executed opportunities where the customer implicitly revealed a business need that aligns with a secondary product offering."
+conversation_pacing_and_dominance,"Analyze the conversational turn-taking dynamics. Did the agent dominate the conversation, or did they actively listen and allow the customer to dictate the problem statement? Quote evidence of active listening."
+friction_points,"Pinpoint exact moments in the interaction where process friction occurred, such as the customer having to repeat information, complex policy explanations, or systemic transfer delays."
+sentiment_volatility,"Map the shift in customer sentiment from the beginning to the end of the call, identifying the exact conversational pivot point or agent action that caused the emotional shift."
+compliance_risk_exposure,"Scan the transcript for potential regulatory or legal risk exposures (e.g., PII mishandling, unauthorized financial promises, or lack of mandatory disclaimers)."
+value_realization_gap,"Identify discrepancies between the customer's expected value of the product/service versus their actual experienced value as expressed during the call. Where is the product falling short of marketing promises?"

@@ -1,0 +1,360 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: conversation-pipeline-template
+spec:
+  entrypoint: conversation-pipeline
+  ttlStrategy:
+    secondsAfterCompletion: 86400
+  activeDeadlineSeconds: 14400
+  arguments:
+    parameters:
+    - name: audio_path
+      value: "raw/audio.wav"
+    - name: prompt_sheet
+      value: "prompts/sample_prompts.csv"
+    - name: call_id
+      value: "CALL_TEST_001"
+    - name: parallel_workers
+      value: "5"
+    - name: parameters_per_batch
+      value: "3"
+    - name: language
+      value: "en"
+    - name: enable_vad
+      value: "true"
+    - name: enable_speaker_tagging
+      value: "true"
+    - name: gpu_count
+      value: "1"
+
+  templates:
+  - name: conversation-pipeline
+    dag:
+      tasks:
+      - name: preprocess
+        template: preprocess-task
+        arguments:
+          parameters:
+          - name: audio_path
+            value: "{{workflow.parameters.audio_path}}"
+          - name: call_id
+            value: "{{workflow.parameters.call_id}}"
+
+      - name: vad
+        template: vad-task
+        dependencies: [preprocess]
+        arguments:
+          parameters:
+          - name: call_id
+            value: "{{workflow.parameters.call_id}}"
+
+      - name: diarization
+        template: diarization-task
+        dependencies: [preprocess]
+        arguments:
+          parameters:
+          - name: call_id
+            value: "{{workflow.parameters.call_id}}"
+
+      - name: transcription
+        template: transcription-task
+        dependencies: [vad]
+        arguments:
+          parameters:
+          - name: call_id
+            value: "{{workflow.parameters.call_id}}"
+
+      - name: alignment
+        template: alignment-task
+        dependencies: [transcription, diarization]
+        arguments:
+          parameters:
+          - name: call_id
+            value: "{{workflow.parameters.call_id}}"
+
+      - name: speaker-tagging
+        template: speaker-tagging-task
+        dependencies: [alignment]
+        arguments:
+          parameters:
+          - name: call_id
+            value: "{{workflow.parameters.call_id}}"
+
+      - name: csv-generation
+        template: csv-generation-task
+        dependencies: [speaker-tagging]
+        arguments:
+          parameters:
+          - name: call_id
+            value: "{{workflow.parameters.call_id}}"
+
+      - name: prompt-parsing
+        template: prompt-parsing-task
+        dependencies: [csv-generation]
+        arguments:
+          parameters:
+          - name: prompt_sheet
+            value: "{{workflow.parameters.prompt_sheet}}"
+
+      - name: batch-creation
+        template: batch-creation-task
+        dependencies: [prompt-parsing]
+        arguments:
+          parameters:
+          - name: call_id
+            value: "{{workflow.parameters.call_id}}"
+
+      - name: insight-processing
+        template: insight-processing-task
+        dependencies: [batch-creation]
+        withParam: "{{tasks.batch-creation.outputs.parameters.batch-list}}"
+        arguments:
+          parameters:
+          - name: call_id
+            value: "{{workflow.parameters.call_id}}"
+          - name: batch_id
+            value: "{{item.batch_id}}"
+
+      - name: aggregation
+        template: aggregation-task
+        dependencies: [insight-processing]
+        arguments:
+          parameters:
+          - name: call_id
+            value: "{{workflow.parameters.call_id}}"
+
+      - name: persistence
+        template: persistence-task
+        dependencies: [aggregation]
+        arguments:
+          parameters:
+          - name: call_id
+            value: "{{workflow.parameters.call_id}}"
+
+  - name: preprocess-task
+    activeDeadlineSeconds: 600
+    retryStrategy:
+      limit: 2
+    inputs:
+      parameters:
+      - name: audio_path
+      - name: call_id
+    container:
+      image: conversation-intelligence-worker:latest
+      command: ["python", "-m", "pipeline.preprocessing.service"]
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 2Gi
+        limits:
+          cpu: 2000m
+          memory: 4Gi
+
+  - name: vad-task
+    activeDeadlineSeconds: 600
+    retryStrategy:
+      limit: 2
+    inputs:
+      parameters:
+      - name: call_id
+    container:
+      image: conversation-intelligence-worker:latest
+      command: ["python", "-m", "pipeline.vad.service"]
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 2Gi
+        limits:
+          cpu: 2000m
+          memory: 4Gi
+
+  - name: transcription-task
+    activeDeadlineSeconds: 1200
+    retryStrategy:
+      limit: 2
+    inputs:
+      parameters:
+      - name: call_id
+    container:
+      image: conversation-intelligence-worker:latest
+      command: ["python", "-m", "pipeline.transcription.service"]
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4Gi
+          nvidia.com/gpu: "1"
+        limits:
+          cpu: 4000m
+          memory: 8Gi
+          nvidia.com/gpu: "1"
+
+  - name: diarization-task
+    activeDeadlineSeconds: 1200
+    retryStrategy:
+      limit: 2
+    inputs:
+      parameters:
+      - name: call_id
+    container:
+      image: conversation-intelligence-worker:latest
+      command: ["python", "-m", "pipeline.diarization.service"]
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4Gi
+          nvidia.com/gpu: "1"
+        limits:
+          cpu: 4000m
+          memory: 8Gi
+          nvidia.com/gpu: "1"
+
+  - name: alignment-task
+    activeDeadlineSeconds: 600
+    retryStrategy:
+      limit: 2
+    inputs:
+      parameters:
+      - name: call_id
+    container:
+      image: conversation-intelligence-worker:latest
+      command: ["python", "-m", "pipeline.alignment.service"]
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 2Gi
+        limits:
+          cpu: 2000m
+          memory: 4Gi
+
+  - name: speaker-tagging-task
+    activeDeadlineSeconds: 600
+    retryStrategy:
+      limit: 2
+    inputs:
+      parameters:
+      - name: call_id
+    container:
+      image: conversation-intelligence-worker:latest
+      command: ["python", "-m", "pipeline.speaker_tagging.service"]
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 2Gi
+        limits:
+          cpu: 2000m
+          memory: 4Gi
+
+  - name: csv-generation-task
+    activeDeadlineSeconds: 600
+    retryStrategy:
+      limit: 2
+    inputs:
+      parameters:
+      - name: call_id
+    container:
+      image: conversation-intelligence-worker:latest
+      command: ["python", "-m", "pipeline.transcript.service"]
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 2Gi
+        limits:
+          cpu: 2000m
+          memory: 4Gi
+
+  - name: prompt-parsing-task
+    activeDeadlineSeconds: 600
+    retryStrategy:
+      limit: 2
+    inputs:
+      parameters:
+      - name: prompt_sheet
+    container:
+      image: conversation-intelligence-worker:latest
+      command: ["python", "-m", "pipeline.insights.prompt_parser"]
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 2Gi
+        limits:
+          cpu: 2000m
+          memory: 4Gi
+
+  - name: batch-creation-task
+    activeDeadlineSeconds: 600
+    retryStrategy:
+      limit: 2
+    inputs:
+      parameters:
+      - name: call_id
+    outputs:
+      parameters:
+      - name: batch-list
+        valueFrom:
+          path: /mnt/vol/batch_list.json
+    container:
+      image: conversation-intelligence-worker:latest
+      command: ["python", "-m", "pipeline.insights.batcher"]
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 2Gi
+        limits:
+          cpu: 2000m
+          memory: 4Gi
+
+  - name: insight-processing-task
+    activeDeadlineSeconds: 600
+    retryStrategy:
+      limit: 2
+    inputs:
+      parameters:
+      - name: call_id
+      - name: batch_id
+    container:
+      image: conversation-intelligence-worker:latest
+      command: ["python", "-m", "pipeline.insights.batch_processor"]
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 2Gi
+        limits:
+          cpu: 2000m
+          memory: 4Gi
+
+  - name: aggregation-task
+    activeDeadlineSeconds: 600
+    retryStrategy:
+      limit: 2
+    inputs:
+      parameters:
+      - name: call_id
+    container:
+      image: conversation-intelligence-worker:latest
+      command: ["python", "-m", "pipeline.insights.aggregator"]
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 2Gi
+        limits:
+          cpu: 2000m
+          memory: 4Gi
+
+  - name: persistence-task
+    activeDeadlineSeconds: 600
+    retryStrategy:
+      limit: 2
+    inputs:
+      parameters:
+      - name: call_id
+    container:
+      image: conversation-intelligence-worker:latest
+      command: ["python", "-m", "pipeline.state"]
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 2Gi
+        limits:
+          cpu: 2000m
+          memory: 4Gi
